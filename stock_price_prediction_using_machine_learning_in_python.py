@@ -99,9 +99,6 @@ plt.show()
 
 plt.figure(figsize=(10, 10))
 
-# As our concern is with the highly
-# correlated features only so, we will visualize
-# our heatmap as per that criteria only.
 sb.heatmap(df.drop('Date', axis=1).corr() > 0.9, annot=True, cbar=False)
 plt.show()
 
