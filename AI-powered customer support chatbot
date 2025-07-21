@@ -1,1 +1,63 @@
-Building an AI-powered customer support chatbot using Seq2Seq and Transformer models with Python and HuggingFace
+pip install tensorflow nltk numpy
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+import nltk
+nltk.download('punkt')
+
+questions = [
+    "How do I reset my password?",
+    "Where can I update my billing info?",
+    "What are your business hours?",
+    "How do I contact support?"
+]
+
+answers = [
+    "Go to 'Account Settings' and click 'Reset Password'.",
+    "You can update billing info in the 'Billing' section.",
+    "Our support team is available 9 AM - 5 PM, Monday to Friday.",
+    "You can email us at support@company.com."
+]
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(questions + answers)
+vocab_size = len(tokenizer.word_index) + 1
+
+question_sequences = tokenizer.texts_to_sequences(questions)
+answer_sequences = tokenizer.texts_to_sequences(answers)
+
+max_len = max(max(len(seq) for seq in question_sequences), max(len(seq) for seq in answer_sequences))
+question_padded = pad_sequences(question_sequences, maxlen=max_len, padding='post')
+answer_padded = pad_sequences(answer_sequences, maxlen=max_len, padding='post')
+
+from tensorflow.keras.layers import Attention, Concatenate
+
+encoder_inputs = Input(shape=(max_len,))
+enc_emb = Embedding(vocab_size, 64)(encoder_inputs)
+encoder_lstm = LSTM(64, return_sequences=True, return_state=True)
+encoder_outputs, state_h, state_c = encoder_lstm(enc_emb)
+
+decoder_inputs = Input(shape=(max_len,))
+dec_emb = Embedding(vocab_size, 64)(decoder_inputs)
+decoder_lstm = LSTM(64, return_sequences=True, return_state=True)
+decoder_outputs, _, _ = decoder_lstm(dec_emb, initial_state=[state_h, state_c])
+
+
+attention = Attention()([decoder_outputs, encoder_outputs])
+decoder_concat = Concatenate()([decoder_outputs, attention])
+decoder_dense = Dense(vocab_size, activation='softmax')
+decoder_outputs = decoder_dense(decoder_concat)
+
+model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
+model.fit([question_padded, answer_padded], answer_padded, epochs=200)  
+def predict_response(input_text):
+    input_seq = tokenizer.texts_to_sequences([input_text])
+    input_padded = pad_sequences(input_seq, maxlen=max_len, padding='post')
+    
+    predicted = model.predict([input_padded, input_padded])
+    predicted_word_ids = np.argmax(predicted, axis=-1)
+    response = tokenizer.sequences_to_texts(predicted_word_ids)[0]
+    return response
+
+print(predict_response("How do I reset my password?"))
